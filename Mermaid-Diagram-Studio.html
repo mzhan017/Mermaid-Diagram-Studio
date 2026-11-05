@@ -1,0 +1,512 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Mermaid 画图工具</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+        color: #172033;
+        background: #f3f5f9;
+      }
+
+      * { box-sizing: border-box; }
+
+      body { margin: 0; min-width: 760px; min-height: 100vh; }
+
+      button, select { font: inherit; }
+
+      .app { display: flex; flex-direction: column; min-height: 100vh; }
+
+      header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 20px;
+        padding: 14px 22px;
+        background: #fff;
+        border-bottom: 1px solid #e3e7ef;
+      }
+
+      .brand { display: flex; align-items: center; gap: 12px; }
+      .logo {
+        display: grid;
+        width: 38px;
+        height: 38px;
+        place-items: center;
+        border-radius: 11px;
+        color: white;
+        background: #6558d3;
+        font-size: 19px;
+        font-weight: 700;
+      }
+      h1 { margin: 0; font-size: 17px; }
+      .subtitle { margin-top: 3px; color: #7a8497; font-size: 12px; }
+      .toolbar, .panel-tools { display: flex; align-items: center; gap: 8px; }
+
+      button, select {
+        min-height: 34px;
+        padding: 6px 11px;
+        border: 1px solid #dce1ea;
+        border-radius: 7px;
+        color: #344054;
+        background: white;
+        cursor: pointer;
+      }
+      button:hover { border-color: #9c94e8; color: #5145bd; }
+      button.primary { border-color: #6558d3; color: white; background: #6558d3; }
+      button.primary:hover { background: #5549c2; }
+      button:disabled { cursor: not-allowed; opacity: .48; }
+
+      main {
+        display: grid;
+        flex: 1;
+        grid-template-columns: minmax(340px, 42%) 1fr;
+        gap: 14px;
+        padding: 14px;
+        min-height: 0;
+      }
+
+      .panel {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        min-height: 0;
+        overflow: hidden;
+        border: 1px solid #e2e6ee;
+        border-radius: 10px;
+        background: #fff;
+        box-shadow: 0 2px 8px #1720330a;
+      }
+
+      .panel-head {
+        display: flex;
+        min-height: 50px;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 8px 13px;
+        border-bottom: 1px solid #edf0f5;
+      }
+      .panel-title { font-size: 13px; font-weight: 650; }
+      .panel-tools select { max-width: 190px; min-height: 30px; padding: 4px 8px; font-size: 12px; }
+      .panel-tools button { min-height: 30px; padding: 4px 9px; font-size: 12px; }
+
+      textarea {
+        flex: 1;
+        width: 100%;
+        min-height: 260px;
+        resize: none;
+        padding: 16px;
+        border: 0;
+        outline: none;
+        color: #e4e9f2;
+        background: #171b26;
+        font: 13px/1.65 Consolas, "Cascadia Code", monospace;
+        tab-size: 2;
+      }
+      textarea::selection { color: white; background: #5145bd; }
+
+      .editor-foot {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 9px 13px;
+        color: #7a8497;
+        font-size: 12px;
+      }
+      .editor-foot kbd {
+        padding: 2px 5px;
+        border: 1px solid #dfe3eb;
+        border-radius: 4px;
+        background: #f8f9fb;
+        font: inherit;
+      }
+
+      .preview-scroll {
+        position: relative;
+        flex: 1;
+        min-height: 260px;
+        overflow: auto;
+        background-color: #fff;
+        background-image: radial-gradient(#e4e7ef 1px, transparent 1px);
+        background-size: 20px 20px;
+      }
+      #preview {
+        display: grid;
+        min-width: 100%;
+        min-height: 100%;
+        place-items: center;
+        padding: 28px;
+      }
+      #preview svg { max-width: none; height: auto; }
+      #preview .placeholder { color: #929bad; font-size: 13px; text-align: center; }
+      #preview .placeholder strong { display: block; margin-bottom: 6px; color: #667085; font-size: 15px; }
+      #error {
+        display: none;
+        margin: 12px;
+        padding: 10px 12px;
+        border: 1px solid #f2c5c5;
+        border-radius: 7px;
+        color: #a4262c;
+        background: #fff4f3;
+        font: 12px/1.5 Consolas, monospace;
+        white-space: pre-wrap;
+      }
+      .status { padding: 9px 13px; border-top: 1px solid #edf0f5; color: #7a8497; font-size: 12px; }
+      .status.ready { color: #21865b; }
+      .status.failed { color: #b42318; }
+
+      @media (max-width: 900px) {
+        body { min-width: 0; }
+        header { align-items: flex-start; flex-direction: column; }
+        main { grid-template-columns: 1fr; grid-template-rows: minmax(360px, 1fr) minmax(360px, 1fr); }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <header>
+        <div class="brand">
+          <div class="logo">M</div>
+          <div>
+            <h1>Mermaid 画图工具</h1>
+            <div class="subtitle">编写文本，实时生成流程图、时序图、类图等</div>
+          </div>
+        </div>
+        <div class="toolbar">
+          <button id="copy-button" type="button">复制代码</button>
+          <button id="svg-button" type="button" disabled>导出 SVG</button>
+          <button id="jpg-button" type="button" disabled>导出 JPG</button>
+          <button id="render-button" class="primary" type="button">生成图表</button>
+        </div>
+      </header>
+
+      <main>
+        <section class="panel" aria-label="Mermaid 代码编辑器">
+          <div class="panel-head">
+            <span class="panel-title">Mermaid 代码</span>
+            <div class="panel-tools">
+              <select id="example-select" aria-label="选择示例">
+                <option value="">插入示例…</option>
+                <option value="flowchart">流程图</option>
+                <option value="sequence">时序图</option>
+                <option value="class">类图</option>
+                <option value="er">实体关系图</option>
+                <option value="state">状态图</option>
+                <option value="gantt">甘特图</option>
+                <option value="pie">饼图</option>
+              </select>
+              <button id="clear-button" type="button">清空</button>
+            </div>
+          </div>
+          <textarea id="source" spellcheck="false" aria-label="Mermaid 源代码"></textarea>
+          <div class="editor-foot">
+            <span>修改后点击“生成图表”</span>
+            <span><kbd>Ctrl</kbd> + <kbd>Enter</kbd> 生成</span>
+          </div>
+        </section>
+
+        <section class="panel" aria-label="图表预览">
+          <div class="panel-head">
+            <span class="panel-title">图表预览</span>
+            <div class="panel-tools">
+              <button id="zoom-out" type="button" aria-label="缩小">−</button>
+              <button id="zoom-reset" type="button" aria-label="重置缩放">100%</button>
+              <button id="zoom-in" type="button" aria-label="放大">+</button>
+            </div>
+          </div>
+          <div class="preview-scroll">
+            <div id="preview">
+              <div class="placeholder"><strong>图表将在这里显示</strong>在左侧输入 Mermaid 代码，然后点击“生成图表”</div>
+            </div>
+            <pre id="error" role="alert"></pre>
+          </div>
+          <div id="status" class="status">就绪</div>
+        </section>
+      </main>
+    </div>
+
+    <script>
+      (() => {
+        const examples = {
+          flowchart: `flowchart TD
+    A[开始] --> B{需要登录吗？}
+    B -- 是 --> C[输入账号密码]
+    B -- 否 --> D[进入首页]
+    C --> D
+    D --> E[完成]`,
+          sequence: `sequenceDiagram
+    actor 用户
+    participant 页面
+    participant 服务端
+    用户->>页面: 点击登录
+    页面->>服务端: 提交账号密码
+    服务端-->>页面: 返回登录结果
+    页面-->>用户: 显示首页`,
+          class: `classDiagram
+    class User {
+      +String name
+      +String email
+      +login()
+    }
+    class Order {
+      +String id
+      +Date createdAt
+      +submit()
+    }
+    User "1" --> "*" Order : 创建`,
+          er: `erDiagram
+    USER ||--o{ ORDER : places
+    ORDER ||--|{ ORDER_ITEM : contains
+    PRODUCT ||--o{ ORDER_ITEM : appears_in
+    USER {
+      int id PK
+      string name
+    }
+    ORDER {
+      int id PK
+      int user_id FK
+    }`,
+          state: `stateDiagram-v2
+    [*] --> 待处理
+    待处理 --> 处理中 : 开始
+    处理中 --> 已完成 : 成功
+    处理中 --> 失败 : 出错
+    失败 --> 处理中 : 重试
+    已完成 --> [*]`,
+          gantt: `gantt
+    title 项目计划
+    dateFormat YYYY-MM-DD
+    section 设计
+    需求梳理 :a1, 2026-03-01, 3d
+    界面设计 :a2, after a1, 4d
+    section 开发
+    功能实现 :b1, after a2, 7d
+    测试验收 :b2, after b1, 3d`,
+          pie: `pie showData
+    title 每周时间分配
+    "工作" : 40
+    "学习" : 20
+    "休息" : 25
+    "其他" : 15`
+        };
+
+        const source = document.querySelector("#source");
+        const preview = document.querySelector("#preview");
+        const errorBox = document.querySelector("#error");
+        const status = document.querySelector("#status");
+        const svgButton = document.querySelector("#svg-button");
+        const jpgButton = document.querySelector("#jpg-button");
+        const zoomResetButton = document.querySelector("#zoom-reset");
+        let renderCount = 0;
+        let zoom = 1;
+
+        mermaid.initialize({
+          startOnLoad: false,
+          securityLevel: "strict",
+          theme: "default",
+          fontFamily: '"Segoe UI", "Microsoft YaHei", sans-serif'
+        });
+
+        function setZoom(value) {
+          zoom = Math.max(0.25, Math.min(2, value));
+          zoomResetButton.textContent = `${Math.round(zoom * 100)}%`;
+          const svg = preview.querySelector("svg");
+          if (svg) svg.style.width = `${zoom * 100}%`;
+        }
+
+        function replaceHtmlLabels(svg) {
+          const namespace = "http://www.w3.org/2000/svg";
+          for (const foreignObject of svg.querySelectorAll("foreignObject")) {
+            const width = Number(foreignObject.getAttribute("width"));
+            const height = Number(foreignObject.getAttribute("height"));
+            const label = foreignObject.querySelector(".nodeLabel") || foreignObject;
+            const getText = (node) => {
+              if (node.nodeType === Node.TEXT_NODE) return node.nodeValue || "";
+              if (node.nodeType !== Node.ELEMENT_NODE) return "";
+              if (node.localName === "br") return "\n";
+              const text = Array.from(node.childNodes, getText).join("");
+              return node.localName === "p" ? `${text}\n` : text;
+            };
+            const lines = getText(label).replace(/\n+$/, "").split("\n");
+            const text = document.createElementNS(namespace, "text");
+            text.setAttribute("class", "nodeLabel");
+            text.setAttribute("x", String(width / 2));
+            text.setAttribute("y", String(height / 2));
+            text.setAttribute("dominant-baseline", "middle");
+            text.setAttribute("text-anchor", "middle");
+
+            if (lines.length === 1) {
+              text.textContent = lines[0];
+            } else {
+              lines.forEach((line, index) => {
+                const tspan = document.createElementNS(namespace, "tspan");
+                tspan.setAttribute("x", String(width / 2));
+                tspan.setAttribute("dy", `${index === 0 ? -0.6 * (lines.length - 1) : 1.2}em`);
+                tspan.textContent = line;
+                text.append(tspan);
+              });
+            }
+            foreignObject.replaceWith(text);
+          }
+        }
+
+        async function renderDiagram() {
+          const code = source.value.trim();
+          errorBox.style.display = "none";
+          status.className = "status";
+
+          if (!code) {
+            preview.innerHTML = '<div class="placeholder"><strong>还没有 Mermaid 代码</strong>请先在左侧输入代码或选择一个示例</div>';
+            svgButton.disabled = true;
+            jpgButton.disabled = true;
+            status.textContent = "请输入 Mermaid 代码";
+            return;
+          }
+
+          status.textContent = "正在生成…";
+          try {
+            const result = await mermaid.render(`mermaid-diagram-${++renderCount}`, code);
+            preview.innerHTML = result.svg;
+            const svg = preview.querySelector("svg");
+            if (svg) {
+              svg.removeAttribute("height");
+              svg.style.width = `${zoom * 100}%`;
+            }
+            if (result.bindFunctions) result.bindFunctions(preview);
+            svgButton.disabled = !svg;
+            jpgButton.disabled = !svg;
+            status.className = "status ready";
+            status.textContent = "生成成功";
+          } catch (error) {
+            errorBox.textContent = error instanceof Error ? error.message : String(error);
+            errorBox.style.display = "block";
+            svgButton.disabled = true;
+            jpgButton.disabled = true;
+            status.className = "status failed";
+            status.textContent = "生成失败，请检查 Mermaid 语法";
+          }
+        }
+
+        document.querySelector("#render-button").addEventListener("click", renderDiagram);
+        document.querySelector("#clear-button").addEventListener("click", () => {
+          source.value = "";
+          renderDiagram();
+          source.focus();
+        });
+        document.querySelector("#copy-button").addEventListener("click", async () => {
+          try {
+            await navigator.clipboard.writeText(source.value);
+            status.className = "status ready";
+            status.textContent = "代码已复制到剪贴板";
+          } catch (error) {
+            status.className = "status failed";
+            status.textContent = `复制失败：${error instanceof Error ? error.message : String(error)}`;
+          }
+        });
+        document.querySelector("#svg-button").addEventListener("click", () => {
+          const svg = preview.querySelector("svg");
+          if (!svg) return;
+          const file = new Blob([new XMLSerializer().serializeToString(svg)], { type: "image/svg+xml;charset=utf-8" });
+          const url = URL.createObjectURL(file);
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = "mermaid-diagram.svg";
+          link.click();
+          URL.revokeObjectURL(url);
+        });
+        jpgButton.addEventListener("click", async () => {
+          const svg = preview.querySelector("svg");
+          if (!svg) return;
+
+          let svgUrl;
+          try {
+            const viewBox = svg.viewBox.baseVal;
+            if (!viewBox || viewBox.width <= 0 || viewBox.height <= 0) {
+              throw new Error("图表缺少有效的尺寸信息，无法导出 JPG");
+            }
+
+            const scale = Math.min(2, 4096 / viewBox.width, 4096 / viewBox.height);
+            const width = Math.max(1, Math.ceil(viewBox.width * scale));
+            const height = Math.max(1, Math.ceil(viewBox.height * scale));
+            const exportSvg = svg.cloneNode(true);
+            replaceHtmlLabels(exportSvg);
+            exportSvg.setAttribute("width", `${width}px`);
+            exportSvg.setAttribute("height", `${height}px`);
+            exportSvg.style.width = `${width}px`;
+            exportSvg.style.height = `${height}px`;
+            svgUrl = URL.createObjectURL(new Blob(
+              [new XMLSerializer().serializeToString(exportSvg)],
+              { type: "image/svg+xml;charset=utf-8" }
+            ));
+
+            const image = new Image();
+            const imageLoaded = new Promise((resolve, reject) => {
+              image.onload = resolve;
+              image.onerror = () => reject(new Error("无法读取图表，JPG 导出失败"));
+            });
+            image.src = svgUrl;
+            await imageLoaded;
+
+            const canvas = document.createElement("canvas");
+            canvas.width = width;
+            canvas.height = height;
+            const context = canvas.getContext("2d");
+            if (!context) throw new Error("浏览器无法创建画布，JPG 导出失败");
+            context.fillStyle = "#ffffff";
+            context.fillRect(0, 0, width, height);
+            context.drawImage(image, 0, 0, width, height);
+
+            const jpg = await new Promise((resolve, reject) => {
+              canvas.toBlob(
+                (blob) => blob ? resolve(blob) : reject(new Error("无法生成 JPG 图片")),
+                "image/jpeg",
+                0.95
+              );
+            });
+            const jpgUrl = URL.createObjectURL(jpg);
+            const link = document.createElement("a");
+            link.href = jpgUrl;
+            link.download = "mermaid-diagram.jpg";
+            link.click();
+            window.setTimeout(() => URL.revokeObjectURL(jpgUrl), 1000);
+            status.className = "status ready";
+            status.textContent = "JPG 图片已导出";
+          } catch (error) {
+            status.className = "status failed";
+            status.textContent = `JPG 导出失败：${error instanceof Error ? error.message : String(error)}`;
+          } finally {
+            if (svgUrl) URL.revokeObjectURL(svgUrl);
+          }
+        });
+        document.querySelector("#example-select").addEventListener("change", (event) => {
+          const example = examples[event.target.value];
+          if (!example) return;
+          source.value = example;
+          event.target.value = "";
+          renderDiagram();
+        });
+        document.querySelector("#zoom-in").addEventListener("click", () => setZoom(zoom + 0.1));
+        document.querySelector("#zoom-out").addEventListener("click", () => setZoom(zoom - 0.1));
+        zoomResetButton.addEventListener("click", () => setZoom(1));
+        source.addEventListener("keydown", (event) => {
+          if ((event.ctrlKey || event.metaKey) && event.key === "Enter") renderDiagram();
+          if (event.key === "Tab") {
+            event.preventDefault();
+            const start = source.selectionStart;
+            const end = source.selectionEnd;
+            source.setRangeText("  ", start, end, "end");
+          }
+        });
+
+        source.value = examples.flowchart;
+        renderDiagram();
+      })();
+    </script>
+  </body>
+</html>
